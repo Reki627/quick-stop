@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Quick Stop — Marcador Golf</title>
+
+<style>
+  :root{
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-glass: rgba(255, 255, 255, 0.85);
+    --muted: #64748b;
+    --text: #0f172a;
+    --primary: #4f46e5;
+    --primary-contrast: #ffffff;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --border: #e2e8f0;
+    --card-radius: 16px;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    --shadow-float: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --font-family: system-ui, -apple-system, sans-serif;
+    --bottom-bar-height: 70px;
+  }
+
+  [data-theme="dark"]{
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-glass: rgba(30, 41, 59, 0.85);
+    --muted: #94a3b8;
+    --text: #f8fafc;
+    --primary: #818cf8;
+    --primary-contrast: #ffffff;
+    --danger-bg: #450a0a;
+    --success-bg: #064e3b;
+    --border: #334155;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  
+  body{
+    margin:0;
+    font-family:var(--font-family);
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom: calc(var(--bottom-bar-height) + 40px);
+    transition: background-color .2s ease;
+  }
+
+  header{
+    position:sticky; top:0; z-index:50;
+    background:var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 20px;
+  }
+  .brand h1{ font-size:1.1rem; margin:0; color:var(--primary); font-weight:800; }
+  .brand p{ margin:2px 0 0 0; font-size:0.8rem; color:var(--muted); font-weight:500 }
+
+  .container{ max-width:680px; margin:20px auto; padding:0 20px }
+
+  .card{
+    background:var(--surface);
+    border-radius:var(--card-radius);
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    padding:20px;
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border-radius:12px; padding:10px 16px; font-weight:600; font-size:0.95rem;
+    border:none; cursor:pointer; text-decoration:none;
+    transition: transform .1s;
+    user-select:none;
+  }
+  .btn:active{ transform: scale(0.97); }
+  
+  .btn-primary{ background:var(--primary); color:var(--primary-contrast); }
+  .btn-outline{ background:transparent; color:var(--text); border:1px solid var(--border); }
+  .btn-ghost{ background:transparent; color:var(--muted); padding:8px; }
+
+  .btn-sm{ padding:6px 12px; font-size:0.85rem; }
+  .icon-btn{ width:44px; height:44px; padding:0; border-radius:50%; flex-shrink:0; font-size:1.2rem; }
+
+  input[type="text"], input[type="number"]{
+    width:100%; padding:12px; border-radius:12px; border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font-size:1rem;
+    outline:none; appearance:none;
+  }
+  input:focus{ border-color:var(--primary); }
+
+  .player-row{ display:flex; gap:10px; margin-bottom:10px; }
+  
+  .grid{ display:grid; grid-template-columns:1fr; gap:16px }
+  @media(min-width:600px){ .grid{ grid-template-columns: repeat(2, 1fr); } }
+
+  .player-card{
+    display:flex; flex-direction:column; gap:12px;
+    padding:16px; border-radius:16px; 
+    border:1px solid var(--border); background:var(--surface);
+    box-shadow:var(--shadow);
+  }
+  .player-card.winner{ border:2px solid var(--success); background:var(--success-bg); }
+  .player-card.lost{ border:2px solid var(--danger); background:var(--danger-bg); }
+
+  .score-display{ font-size:2.8rem; font-weight:800; color:var(--primary); text-align:center; padding:10px 0; }
+  .player-card.lost .score-display{ color:var(--danger); text-decoration:line-through; }
+  .player-card.winner .score-display{ color:var(--success); }
+
+  .control-group{ display:flex; gap:8px; }
+  
+  details.history{ margin-top:auto; padding-top:10px; border-top:1px dashed var(--border); }
+  summary{ font-size:0.85rem; color:var(--muted); cursor:pointer; list-style:none; }
+  .history-list{ list-style:none; padding:0; margin:8px 0 0; max-height:100px; overflow-y:auto; font-size:0.85rem; color:var(--muted); }
+  .history-item{ display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border); }
+
+  .toolbar-wrapper{
+    position:fixed; bottom:20px; left:0; right:0;
+    display:flex; justify-content:center; 
+    z-index:100; pointer-events:none;
+  }
+  .toolbar{
+    pointer-events:all;
+    background:var(--surface-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow-float);
+    border-radius:24px; padding:8px;
+    display:flex; gap:8px; align-items:center;
+    transition: all .3s ease;
+  }
+  .toolbar-options{ display:flex; gap:8px; overflow:hidden; max-width:0; opacity:0; transition: all .3s ease; }
+  .toolbar.expanded .toolbar-options{ max-width:300px; opacity:1; margin-right:8px; padding-right:8px; border-right:1px solid var(--border); }
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); 
+    backdrop-filter:blur(4px); z-index:200;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{ width:100%; max-width:480px; background:var(--surface); border-radius:24px; padding:24px; box-shadow:var(--shadow-float); }
+
+  .podium-list{ list-style:none; padding:0; margin:16px 0; }
+  .podium-item{ 
+    display:flex; align-items:center; justify-content:space-between; 
+    padding:12px; margin-bottom:8px; border-radius:12px; background:var(--bg);
+  }
+  .podium-item.rank-1{ border-left: 4px solid var(--success); background:var(--success-bg); font-weight:bold; }
+  .podium-item.rank-last{ border-left: 4px solid var(--danger); background: var(--danger-bg); }
+  
+  .helper-text{ font-size:0.85rem; color:var(--muted); margin-top:4px }
+  .hidden{ display:none !important }
+  .animate-pop{ animation: pop .3s ease }
+  @keyframes pop{ 50%{transform:scale(1.2)} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Quick Stop</h1>
+    <p>Golf: Pierde con >= 40 pts.</p>
+  </div>
+  <button id="themeToggle" class="btn btn-ghost icon-btn">🌙</button>
+</header>
+
+<main id="setupScreen" class="container">
+  <div class="card">
+    <h2 style="margin:0 0 16px 0; font-size:1.25rem">Jugadores</h2>
+    <form id="setupForm">
+      <div id="playersInputs"></div>
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button type="button" id="addPlayerBtn" class="btn btn-outline" style="flex:1">+ Añadir</button>
+      </div>
+      <hr style="border:0; border-top:1px solid var(--border); margin:20px 0">
+      <div style="display:flex; justify-content:flex-end; gap:10px">
+        <button type="button" id="clearPlayersBtn" class="btn btn-ghost">Borrar</button>
+        <button type="submit" class="btn btn-primary" style="min-width:120px; font-weight:bold">EMPEZAR</button>
+      </div>
+      <div id="setupError" style="background:var(--danger-bg); color:var(--danger); padding:10px; border-radius:8px; margin-top:15px; font-weight:600; display:none; text-align:center;"></div>
+    </form>
+  </div>
+</main>
+
+<main id="gameScreen" class="container hidden">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+    <div>
+      <span style="font-weight:800; font-size:1.2rem; color:var(--text)">Tablero</span>
+      <div id="gameStatusTag" style="font-size:0.8rem; color:var(--muted)">En juego</div>
+    </div>
+    <button id="finishBtn" class="btn btn-sm btn-primary">Finalizar Partida</button>
+  </div>
+  <div id="scoreboard" class="grid"></div>
+</main>
+
+<div id="gameTools" class="toolbar-wrapper hidden">
+  <div class="toolbar" id="toolbar">
+    <div class="toolbar-options">
+      <button id="importJsonBtn" class="btn btn-ghost icon-btn">📥</button>
+      <button id="exportJsonBtn" class="btn btn-ghost icon-btn">📤</button>
+      <button id="editPlayersBtn" class="btn btn-ghost icon-btn">✏️</button>
+    </div>
+    <button id="toggleMenuBtn" class="btn btn-outline icon-btn">☰</button>
+    <button id="newMatchBtn" class="btn btn-primary">🔁 Nueva</button>
+  </div>
+</div>
+
+<div id="podiumModal" class="modal-backdrop">
+  <div class="modal">
+    <div style="text-align:center; margin-bottom:20px">
+      <div style="font-size:3rem">🏁</div>
+      <h2 style="margin:8px 0">Resultados Finales</h2>
+      <p id="modalReason" class="helper-text"></p>
+    </div>
+    <ul id="podiumList" class="podium-list"></ul>
+    <div style="display:flex; gap:10px; margin-top:20px">
+      <button id="closeModalBtn" class="btn btn-outline" style="flex:1">Cerrar</button>
+      <button id="downloadImgBtn" class="btn btn-primary" style="flex:1">Imagen</button>
+    </div>
+  </div>
+</div>
+<canvas id="exportCanvas" style="display:none"></canvas>
+
+<script>
+const STORAGE_KEY = 'quickStopState_golf_manual_v1';
+const $ = (id) => document.getElementById(id);
+
+let state = {
+  players: [],
+  theme: 'light',
+  gameActive: false
+};
+
+function init(){
+  loadState();
+  applyTheme();
+  if(!state.players || state.players.length === 0){
+    state.players = [];
+    addPlayerInput(); addPlayerInput();
+    showSetup();
+  } else {
+    if(state.gameActive){ renderGame(); showGame(); } 
+    else { fillSetupInputs(); showSetup(); }
+  }
+}
+
+function loadState(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      state = { ...state, ...parsed };
+      if(Array.isArray(state.players)){
+        state.players.forEach(p => { p.id = String(p.id).replace(/\./g, '_'); });
+      }
+    }
+  } catch(e) { state.players = []; }
+}
+
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.theme);
+  $('themeToggle').textContent = state.theme === 'dark' ? '☀️' : '🌙';
+}
+
+function addPlayerInput(val=''){
+  const container = $('playersInputs');
+  if(container.children.length >= 8) return;
+  const div = document.createElement('div');
+  div.className = 'player-row';
+  div.innerHTML = `<input type="text" value="${escapeHtml(val)}" placeholder="Nombre Jugador" />
+    ${container.children.length >= 2 ? '<button type="button" class="btn btn-ghost icon-btn" style="color:var(--danger)">✕</button>' : ''}`;
+  const btn = div.querySelector('button');
+  if(btn) btn.onclick = () => div.remove();
+  container.appendChild(div);
+}
+
+function fillSetupInputs(){
+  $('playersInputs').innerHTML = '';
+  state.players.forEach(p => addPlayerInput(p.name));
+  if(state.players.length === 0) { addPlayerInput(); addPlayerInput(); }
+}
+
+$('addPlayerBtn').onclick = () => addPlayerInput();
+$('clearPlayersBtn').onclick = () => { $('playersInputs').innerHTML=''; addPlayerInput(); addPlayerInput(); };
+
+$('setupForm').onsubmit = (e) => {
+  e.preventDefault(); 
+  $('setupError').style.display = 'none';
+  try {
+    const inputs = [...$('playersInputs').querySelectorAll('input')];
+    const names = inputs.map(i => i.value.trim()).filter(n => n.length > 0);
+    if(names.length < 2){ showError("⚠️ Mínimo 2 jugadores."); return; }
+    
+    state.players = names.map((name, index) => ({
+      id: Date.now() + '_' + index,
+      name: name,
+      score: 0,
+      status: 'active',
+      history: []
+    }));
+    
+    state.gameActive = true;
+    saveState();
+    renderGame();
+    showGame();
+  } catch(err) { showError("Error: " + err.message); }
+};
+
+function showError(msg){
+  const el = $('setupError'); el.innerText = msg; el.style.display = 'block';
+}
+
+function addPoints(playerId){
+  const input = document.getElementById(`input-${playerId}`);
+  if(!input) return;
+  const val = parseInt(input.value);
+  if(isNaN(val)) return;
+  
+  const p = state.players.find(x => x.id === playerId);
+  if(!p) return;
+  
+  const old = p.score;
+  p.score += val;
+  p.history.push({ val, old, new: p.score, time: new Date().toLocaleTimeString().slice(0,5) });
+  
+  // Actualizar estado visual de pérdida pero NO terminar el juego
+  if(p.score >= 40) p.status = 'lost';
+  else p.status = 'active';
+
+  input.value = '';
+  saveState();
+  renderGame(); // Re-renderizamos para aplicar estilos de pérdida
+}
+
+function renderGame(){
+  const board = $('scoreboard');
+  board.innerHTML = '';
+  
+  state.players.forEach(p => {
+    const isOverLimit = p.score >= 40;
+    const isWinner = p.status === 'winner';
+    const card = document.createElement('div');
+    
+    // Si ha pasado de 40, aplicar clase 'lost' inmediatamente para visualización
+    card.className = `player-card ${isOverLimit ? 'lost' : ''} ${isWinner ? 'winner' : ''}`;
+    
+    const badge = isWinner ? '<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:bold">GANADOR</span>' 
+                : (isOverLimit ? '<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:bold">ELIMINADO (>=40)</span>' : '');
+
+    const disabled = !state.gameActive ? 'disabled' : '';
+    
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:bold;font-size:1.1rem">${escapeHtml(p.name)}</span>
+        ${badge}
+      </div>
+      <div class="score-display" id="score-${p.id}">${p.score}</div>
+      <div class="control-group">
+        <input type="number" id="input-${p.id}" placeholder="Pts" ${disabled} enterkeyhint="done">
+        <button class="btn btn-primary" id="btn-add-${p.id}" ${disabled}>+</button>
+      </div>
+      <details class="history" id="hist-container-${p.id}">
+        <summary>Historial</summary>
+        <ul class="history-list"></ul>
+      </details>
+    `;
+    board.appendChild(card);
+    
+    document.getElementById(`btn-add-${p.id}`).onclick = () => addPoints(p.id);
+    document.getElementById(`input-${p.id}`).addEventListener('keypress', (e)=>{ if(e.key==='Enter') addPoints(p.id); });
+    renderHistory(p);
+  });
+  $('gameStatusTag').innerText = state.gameActive ? 'En curso' : 'Finalizada';
+}
+
+function renderHistory(p){
+  const container = document.getElementById(`hist-container-${p.id}`);
+  if(!container) return;
+  const ul = container.querySelector('.history-list');
+  if(!p.history || p.history.length === 0) { ul.innerHTML = '<li>-</li>'; return; }
+  ul.innerHTML = [...p.history].reverse().map(h => `<li class="history-item"><span>${h.time}</span><span>${h.old} → <b>${h.new}</b> (${h.val>=0?'+':''}${h.val})</span></li>`).join('');
+}
+
+function finalizeGame(){
+  if(!confirm('¿Deseas finalizar la partida y ver los resultados?')) return;
+  
+  state.gameActive = false;
+  
+  // Lógica de podio: Solo ganan los que tienen < 40. De esos, el menor puntuación.
+  const validPlayers = state.players.filter(p => p.score < 40);
+  let minScore = Infinity;
+  if(validPlayers.length > 0){
+    minScore = Math.min(...validPlayers.map(p => p.score));
+  }
+  
+  state.players.forEach(p => {
+    if(p.score >= 40) p.status = 'lost';
+    else if(p.score === minScore) p.status = 'winner';
+    else p.status = 'active';
+  });
+  
+  saveState();
+  renderGame();
+  showPodium();
+}
+
+function showPodium(){
+  const list = $('podiumList');
+  list.innerHTML = '';
+  // Ordenar: primero los que no han perdido (menor a mayor), luego los eliminados
+  const sorted = [...state.players].sort((a,b) => {
+    if(a.score >= 40 && b.score < 40) return 1;
+    if(a.score < 40 && b.score >= 40) return -1;
+    return a.score - b.score;
+  });
+  
+  sorted.forEach((p, i) => {
+    const li = document.createElement('li');
+    let extraClass = '';
+    if(p.status === 'winner') extraClass = 'rank-1';
+    if(p.score >= 40) extraClass = 'rank-last';
+    
+    li.className = `podium-item ${extraClass}`;
+    li.innerHTML = `<span>${i+1}. <b>${escapeHtml(p.name)}</b> ${p.score>=40?'💀':(p.status==='winner'?'🏆':'')}</span>
+      <span style="font-weight:800;font-size:1.1rem">${p.score}</span>`;
+    list.appendChild(li);
+  });
+  
+  $('modalReason').innerText = 'Partida terminada por el usuario.';
+  $('podiumModal').classList.add('open');
+}
+
+function showSetup(){
+  $('setupScreen').classList.remove('hidden'); $('gameScreen').classList.add('hidden'); $('gameTools').classList.add('hidden');
+}
+function showGame(){
+  $('setupScreen').classList.add('hidden'); $('gameScreen').classList.remove('hidden'); $('gameTools').classList.remove('hidden');
+}
+
+$('toggleMenuBtn').onclick = () => $('toolbar').classList.toggle('expanded');
+$('closeModalBtn').onclick = () => $('podiumModal').classList.remove('open');
+$('newMatchBtn').onclick = () => { if(confirm('¿Reiniciar puntos?')){ state.players.forEach(p=>{p.score=0;p.status='active';p.history=[];}); state.gameActive=true; saveState(); renderGame(); } };
+$('finishBtn').onclick = () => finalizeGame();
+$('editPlayersBtn').onclick = () => { if(confirm('¿Editar jugadores? Perderás el progreso.')){ state.gameActive=false; showSetup(); } };
+$('themeToggle').onclick = () => { state.theme = state.theme === 'light' ? 'dark' : 'light'; applyTheme(); saveState(); };
+
+$('downloadImgBtn').onclick = () => {
+  const c = $('exportCanvas'); const ctx = c.getContext('2d');
+  const W=600, rowH=60, H=100 + (state.players.length*rowH);
+  c.width=W; c.height=H;
+  ctx.fillStyle = state.theme==='dark'?'#1e293b':'#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#4f46e5'; ctx.fillRect(0,0,W,70);
+  ctx.fillStyle = '#fff'; ctx.font='bold 28px sans-serif'; ctx.fillText('Resultados Finales', 20, 45);
+  const sorted = [...state.players].sort((a,b)=>a.score-b.score);
+  let y=120;
+  sorted.forEach((p,i)=>{
+    ctx.fillStyle = state.theme==='dark'?'#fff':'#000';
+    if(p.score>=40) ctx.fillStyle='#ef4444';
+    if(p.status==='winner') ctx.fillStyle='#10b981';
+    ctx.textAlign='left'; ctx.font='20px sans-serif';
+    ctx.fillText(`${i+1}. ${p.name} ${p.score>=40?'(Eliminado)':''}`, 40, y-10);
+    ctx.textAlign='right'; ctx.font='bold 22px sans-serif';
+    ctx.fillText(p.score, W-40, y-10);
+    y+=rowH;
+  });
+  const a = document.createElement('a'); a.download = 'quickstop_golf.png'; a.href = c.toDataURL(); a.click();
+};
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m])); }
+
+init();
+</script>
+</body>
+</html>
