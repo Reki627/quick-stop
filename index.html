@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quick Stop — Marcador</title>
+
+<!--
+Quick Stop - Mejoras visuales
+- Tema claro/oscuro (completamente aplicado mediante variables CSS y data-theme)
+- Flujo de pantallas: Setup -> Pantalla de juego (separadas)
+- Animaciones en botones (press, scale, smooth transitions)
+- Organización móvil-prioritaria, espaciados y jerarquía
+- Lógica de puntuación y persistencia respetada (la partida solo finaliza cuando se pulsa "FINALIZAR")
+-->
+
+<style>
+  /* =========================
+     Variables globales (tema claro por defecto)
+     ========================= */
+  :root{
+    --bg: #f7f8fb;
+    --surface: #ffffff;
+    --muted: #60708a;
+    --text: #0f1724;
+    --primary: #6366f1;
+    --primary-contrast: #ffffff;
+    --primary-press: #4f46e5;
+    --danger: #ef4444;
+    --danger-bg: #fff1f2;
+    --success: #16a34a;
+    --border: #e6edf6;
+    --card-radius: 14px;
+    --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    --glass: rgba(255,255,255,0.6);
+    --focus: 3px solid rgba(99,102,241,0.18);
+    --gap: 12px;
+    --font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+
+  /* Dark theme overrides */
+  [data-theme="dark"]{
+    --bg: #0b1220;
+    --surface: #0f1724;
+    --muted: #94a3b8;
+    --text: #f1f5f9;
+    --primary: #7c8cff;
+    --primary-contrast: #0b1220;
+    --primary-press: #5f76ff;
+    --danger-bg: #3f0f12;
+    --border: #121827;
+    --glass: rgba(255,255,255,0.02);
+    --shadow: 0 8px 24px rgba(0,0,0,0.6);
+    --focus: 3px solid rgba(124,140,255,0.12);
+  }
+
+  /* =========================
+     Reset & Base
+     ========================= */
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:var(--font-family);
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    line-height:1.45;
+    padding-bottom:76px; /* espacio para controles sticky */
+    transition: background-color .22s ease, color .22s ease;
+  }
+
+  header{
+    position:sticky;top:0;z-index:40;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;
+    box-shadow:var(--shadow);
+  }
+  .brand{
+    display:flex;flex-direction:column;
+    gap:2px;
+  }
+  .brand h1{font-size:1.05rem;margin:0;color:var(--primary);letter-spacing:0.2px}
+  .brand p{margin:0;font-size:0.82rem;color:var(--muted)}
+
+  /* Container - mobile first */
+  .container{max-width:760px;margin:14px auto;padding:0 16px}
+
+  /* Card */
+  .card{
+    background:var(--surface);
+    border-radius:var(--card-radius);
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    padding:14px;
+    transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+
+  /* Buttons (centralizado en estilos para consistencia) */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border-radius:10px;padding:8px 12px;font-weight:800;font-size:0.95rem;
+    border: none; cursor:pointer;
+    transition: transform .12s cubic-bezier(.2,.9,.2,1), box-shadow .12s, background-color .12s;
+    user-select:none;
+  }
+  .btn:active{ transform: translateY(1px) scale(.99); }
+  .btn:focus{ outline: none; box-shadow: var(--focus); border-radius:10px; }
+
+  .btn-primary{ background:var(--primary); color:var(--primary-contrast); box-shadow: 0 6px 18px rgba(99,102,241,0.12); }
+  .btn-primary:hover{ background: var(--primary-press); transform: translateY(-2px) scale(.997); }
+  .btn-outline{ background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-danger{ background: var(--danger); color: white; }
+  .btn-sm{ padding:6px 10px; font-size:0.86rem; border-radius:9px; }
+
+  /* Focus visible (keyboard) */
+  :focus-visible{ outline: none; box-shadow: var(--focus); border-radius:10px; }
+
+  /* Setup screen */
+  .setup-title{ font-size:1rem; margin-bottom:6px; font-weight:800; color:var(--text) }
+  .setup-hint{ font-size:0.9rem; color:var(--muted); margin-bottom:10px }
+
+  .players-list{ display:flex;flex-direction:column; gap:10px; margin-top:6px }
+  .player-row{ display:flex; gap:8px; align-items:center }
+  .player-row input[type="text"]{
+    flex:1;padding:10px;border-radius:10px;border:1px solid var(--border); background:transparent; color:var(--text);
+    font-size:1rem;
+    transition: box-shadow .12s, border-color .12s;
+  }
+  .player-row input[type="text"]:focus{ box-shadow: var(--focus); border-color: var(--primary); outline: none; }
+
+  .controls-row{ display:flex; gap:8px; margin-top:10px; justify-content:space-between; align-items:center }
+
+  .error-msg{ color:var(--danger); font-size:0.9rem; display:none }
+
+  /* Game screen */
+  .game-header{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px }
+  .status-pill{ font-size:0.88rem; padding:6px 8px; border-radius:10px; font-weight:700; color:var(--primary-contrast); background:var(--primary) }
+  .status-pill.inactive{ background:transparent;color:var(--danger); border:1px solid var(--border) }
+
+  /* Grid / cards */
+  .grid{ display:grid; grid-template-columns:1fr; gap:12px }
+  @media(min-width:720px){ .grid{ grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); } }
+
+  .player-card{
+    display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface);
+  }
+  .player-card.lost{ border-color:var(--danger); background:var(--danger-bg) }
+
+  .player-header{ display:flex; justify-content:space-between; align-items:center }
+  .player-name{ font-weight:900; font-size:1.02rem }
+  .status-badge{ font-size:0.75rem;padding:6px 8px;border-radius:8px;color:white;background:var(--danger); font-weight:900 }
+
+  .score-display{ font-size:2rem; font-weight:900; text-align:center; color:var(--primary); padding:6px 0 }
+  .player-card.lost .score-display{ color:var(--danger); text-decoration:line-through }
+
+  .score-controls{ display:flex; gap:8px; align-items:center }
+  .score-controls input[type="number"]{
+    flex:1;padding:10px;border-radius:10px;border:1px solid var(--border); background:transparent; font-size:1rem; color:var(--text)
+  }
+  .score-controls input[type="number"]:focus{ box-shadow: var(--focus); outline:none; }
+
+  details.history-details{ border-top:1px dashed var(--border); padding-top:8px; margin-top:auto }
+  summary{ cursor:pointer; font-size:0.9rem; color:var(--muted); outline:none }
+  .history-list{ list-style:none; max-height:110px; overflow:auto; margin-top:6px; color:var(--muted); font-size:0.9rem }
+
+  /* Modal */
+  .modal-overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:80; padding:12px }
+  .modal-overlay.open{ display:flex }
+  .modal-card{ width:100%; max-width:560px; border-radius:12px; padding:16px; background:var(--surface); border:1px solid var(--border) }
+
+  /* Utilities sticky bottom */
+  .utilities{
+    position:fixed; left:12px; right:12px; bottom:12px; z-index:70;
+    display:flex; gap:10px; justify-content:space-between; align-items:center;
+  }
+  .utilities .btn{ flex:1; padding:10px; border-radius:12px; font-weight:800; font-size:0.95rem }
+
+  /* small helpers */
+  .muted{ color:var(--muted); font-size:0.92rem }
+  .small{ font-size:0.86rem }
+  .animate-pop{ animation: pop .32s ease; }
+  @keyframes pop{ 0%{ transform:scale(1) } 50%{ transform:scale(1.08) } 100%{ transform:scale(1) } }
+  .hidden{ display:none !important }
+
+  /* Accessibility: ensure contrast on buttons in dark */
+  [data-theme="dark"] .btn-outline{ border-color: rgba(255,255,255,0.06) }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand" aria-hidden="false">
+    <h1>Quick Stop</h1>
+    <p class="muted">40 pts = PERDIDO (no finaliza automáticamente)</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button id="themeToggle" class="btn btn-outline btn-sm" aria-label="Cambiar tema">🌙</button>
+  </div>
+</header>
+
+<!-- SETUP (pantalla 1) -->
+<main id="setupScreen" class="container">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="setup-title">Configuración de jugadores</div>
+        <div class="setup-hint muted">Añade entre 2 y 7 jugadores. Los nombres se guardan automáticamente y se mantienen entre partidas.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <div class="small muted">Control</div>
+        <div style="display:flex;gap:6px">
+          <button id="loadLastBtn" class="btn btn-outline btn-sm" title="Cargar últimos nombres">⤴ Últimos</button>
+        </div>
+      </div>
+    </div>
+
+    <form id="setupForm" style="margin-top:12px">
+      <div id="playersInputs" class="players-list" aria-live="polite"></div>
+
+      <div class="controls-row" style="margin-top:12px">
+        <button id="addPlayerBtn" type="button" class="btn btn-outline">+ Añadir jugador</button>
+        <div style="display:flex;gap:8px">
+          <button type="button" id="clearPlayersBtn" class="btn btn-outline btn-sm">Limpiar</button>
+          <button type="submit" class="btn btn-primary">Comenzar partida</button>
+        </div>
+      </div>
+
+      <div id="setupError" class="error-msg" role="alert" aria-live="assertive"></div>
+    </form>
+  </div>
+</main>
+
+<!-- GAME (pantalla 2) -->
+<main id="gameScreen" class="container hidden" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div>
+      <div style="font-weight:800;font-size:1rem">Tablero</div>
+      <div id="gameStatusTag" class="muted small">Estado: —</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="editPlayersBtn" class="btn btn-outline btn-sm" title="Editar jugadores">Editar</button>
+      <button id="finishBtn" class="btn btn-primary" title="Finalizar partida">FINALIZAR</button>
+    </div>
+  </div>
+
+  <div id="scoreboard" class="grid" aria-live="polite"></div>
+</main>
+
+<!-- Modal Podio -->
+<div id="podiumModal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-card card">
+    <h3 id="modalTitle">🏁 Partida finalizada</h3>
+    <p id="modalReason" class="muted small">Resultado</p>
+
+    <ul id="podiumList" style="list-style:none;padding:0;margin-top:10px"></ul>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="closeModalBtn" class="btn btn-outline" style="flex:1">Ver tablero</button>
+      <button id="downloadImgBtn" class="btn btn-primary" style="flex:1">Descargar imagen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Utilities sticky bottom -->
+<div class="utilities" role="region" aria-label="Controles">
+  <button id="newMatchBtn" class="btn btn-primary">🔁 Nueva partida</button>
+  <button id="exportJsonBtn" class="btn btn-outline">📤 Exportar JSON</button>
+  <button id="importJsonBtn" class="btn btn-outline">📥 Importar JSON</button>
+</div>
+
+<canvas id="exportCanvas" style="display:none"></canvas>
+
+<script>
+/* =============================================================================
+   Quick Stop — Mejoras visuales y flujo
+   - Mantiene la lógica previa: la partida solo finaliza con "FINALIZAR".
+   - Estado persistente en localStorage (nombres, puntuaciones, historial, theme).
+   - Comentarios en funciones principales.
+   ============================================================================= */
+
+const STORAGE_KEY = 'quickStopState_v3';
+const FINAL_KEY = 'quickStopFinal_v3';
+
+/* Estado */
+let state = {
+  players: [],       // { id, name, score, status, history }
+  theme: 'light',
+  gameActive: false,
+  startTime: null,
+  endTime: null
+};
+
+/* DOM refs */
+const dom = {
+  setupScreen: document.getElementById('setupScreen'),
+  gameScreen: document.getElementById('gameScreen'),
+  playersInputs: document.getElementById('playersInputs'),
+  setupForm: document.getElementById('setupForm'),
+  addPlayerBtn: document.getElementById('addPlayerBtn'),
+  setupError: document.getElementById('setupError'),
+  scoreboard: document.getElementById('scoreboard'),
+  gameStatusTag: document.getElementById('gameStatusTag'),
+  finishBtn: document.getElementById('finishBtn'),
+  editPlayersBtn: document.getElementById('editPlayersBtn'),
+  newMatchBtn: document.getElementById('newMatchBtn'),
+  exportJsonBtn: document.getElementById('exportJsonBtn'),
+  importJsonBtn: document.getElementById('importJsonBtn'),
+  podiumModal: document.getElementById('podiumModal'),
+  podiumList: document.getElementById('podiumList'),
+  modalTitle: document.getElementById('modalTitle'),
+  modalReason: document.getElementById('modalReason'),
+  closeModalBtn: document.getElementById('closeModalBtn'),
+  downloadImgBtn: document.getElementById('downloadImgBtn'),
+  themeToggle: document.getElementById('themeToggle'),
+  loadLastBtn: document.getElementById('loadLastBtn'),
+  clearPlayersBtn: document.getElementById('clearPlayersBtn'),
+  exportCanvas: document.getElementById('exportCanvas')
+};
+
+/* -------------------------
+   Persistencia
+   ------------------------- */
+function loadState(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try{
+      const parsed = JSON.parse(raw);
+      Object.assign(state, parsed);
+      // Ensure minimal structure
+      state.players = (state.players || []).map(p => ({
+        id: p.id || (Date.now() + Math.random()*1000|0),
+        name: p.name || 'Jugador',
+        score: p.score || 0,
+        status: p.status || 'active',
+        history: p.history || []
+      }));
+      state.theme = parsed.theme || state.theme;
+      state.gameActive = parsed.gameActive || false;
+    }catch(e){
+      console.warn('No se pudo cargar estado', e);
+    }
+  }
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function saveFinalGameData(){
+  const finalData = {
+    players: state.players.map(p => ({ name: p.name, score: p.score, status: p.status })),
+    finishedAt: new Date().toISOString()
+  };
+  localStorage.setItem(FINAL_KEY, JSON.stringify(finalData));
+}
+
+/* -------------------------
+   Tema (aplicado globalmente)
+   ------------------------- */
+function applyTheme(){
+  if(state.theme === 'dark'){
+    document.documentElement.setAttribute('data-theme','dark');
+    dom.themeToggle.textContent = '☀️';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    dom.themeToggle.textContent = '🌙';
+  }
+  saveState();
+}
+dom.themeToggle.addEventListener('click', () => {
+  state.theme = (state.theme === 'light') ? 'dark' : 'light';
+  applyTheme();
+});
+
+/* -------------------------
+   UI: Setup screen - inputs
+   ------------------------- */
+function addPlayerInput(value=''){
+  if(dom.playersInputs.children.length >= 7) return;
+  const row = document.createElement('div');
+  row.className = 'player-row';
+  row.innerHTML = `
+    <input type="text" value="${escapeHtml(value)}" placeholder="Nombre" aria-label="Nombre del jugador" />
+    ${dom.playersInputs.children.length >= 2 ? '<button type="button" aria-label="Eliminar jugador">✕</button>' : ''}
+  `;
+  const btn = row.querySelector('button');
+  if(btn) btn.addEventListener('click', ()=> row.remove());
+  dom.playersInputs.appendChild(row);
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* Pre-fill inputs from saved players (if any) */
+function fillSetupWithSavedPlayers(){
+  dom.playersInputs.innerHTML = '';
+  if(state.players.length){
+    state.players.forEach(p => addPlayerInput(p.name));
+  } else {
+    addPlayerInput(); addPlayerInput(); addPlayerInput();
+  }
+}
+
+/* Events: add, clear, load last */
+dom.addPlayerBtn.addEventListener('click', (e)=> { addPlayerInput(); e.currentTarget.blur(); });
+dom.clearPlayersBtn = dom.clearPlayersBtn || document.getElementById('clearPlayersBtn');
+dom.clearPlayersBtn.addEventListener('click', ()=> {
+  if(!confirm('¿Limpiar todos los jugadores actuales?')) return;
+  dom.playersInputs.innerHTML = '';
+  addPlayerInput(); addPlayerInput();
+});
+
+dom.loadLastBtn.addEventListener('click', () => {
+  const raw = localStorage.getItem(FINAL_KEY);
+  if(!raw){ alert('No hay partida final previa guardada.'); return; }
+  try{
+    const parsed = JSON.parse(raw);
+    // parsed.players -> array of {name, score}
+    dom.playersInputs.innerHTML = '';
+    parsed.players.forEach(p => addPlayerInput(p.name));
+  }catch(e){ alert('No se pudo cargar'); }
+});
+
+/* Submit: Comenzar partida (muestra pantalla de juego) */
+dom.setupForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const inputs = [...dom.playersInputs.querySelectorAll('input')];
+  const names = inputs.map(i => i.value.trim()).filter(n => n !== '');
+  if(names.length < 2){ showSetupError('Añade al menos 2 jugadores.'); return; }
+  if(new Set(names).size !== names.length){ showSetupError('Nombres duplicados.'); return; }
+
+  // Preserve existing IDs if names match, else create
+  const prevMap = {};
+  state.players.forEach(p => { prevMap[p.name] = p; });
+
+  state.players = names.map((name, idx) => {
+    if(prevMap[name]){
+      return { id: prevMap[name].id, name, score: 0, status:'active', history: [] };
+    } else {
+      return { id: Date.now()+idx + (Math.random()*1000|0), name, score:0, status:'active', history: [] };
+    }
+  });
+
+  state.gameActive = true;
+  state.startTime = Date.now();
+  state.endTime = null;
+  saveState();
+
+  renderGame();
+  showGameScreen();
+});
+
+/* Error display on setup */
+function showSetupError(msg){
+  dom.setupError.innerText = msg; dom.setupError.style.display = 'block';
+  setTimeout(()=> { dom.setupError.style.display = 'none'; }, 3200);
+}
+
+/* -------------------------
+   Show / Hide screens
+   ------------------------- */
+function showGameScreen(){
+  dom.setupScreen.classList.add('hidden');
+  dom.gameScreen.classList.remove('hidden');
+  dom.setupScreen.setAttribute('aria-hidden','true');
+  dom.gameScreen.setAttribute('aria-hidden','false');
+  updateGameStatusTag();
+}
+
+function showSetupScreen(){
+  dom.setupScreen.classList.remove('hidden');
+  dom.gameScreen.classList.add('hidden');
+  dom.setupScreen.setAttribute('aria-hidden','false');
+  dom.gameScreen.setAttribute('aria-hidden','true');
+  fillSetupWithSavedPlayers();
+}
+
+/* -------------------------
+   Render tablero
+   ------------------------- */
+function updateGameStatusTag(){
+  dom.gameStatusTag.textContent = state.gameActive ? 'Estado: En curso' : 'Estado: Finalizada';
+  dom.gameStatusTag.className = state.gameActive ? 'muted small' : 'muted small';
+}
+
+function renderGame(){
+  dom.scoreboard.innerHTML = '';
+  updateGameStatusTag();
+
+  state.players.forEach(player => {
+    const card = document.createElement('div');
+    card.className = 'player-card' + (player.status === 'lost' ? ' lost' : '');
+
+    const historyHtml = (player.history || []).slice().reverse().map(h => `
+      <li class="history-item"><span>${h.time}</span><span>${h.pre} → <strong>${h.post}</strong> (+${h.val})</span></li>
+    `).join('') || '<li class="history-item"><span style="opacity:.6">- Sin movimientos -</span></li>';
+
+    const disabledAttr = state.gameActive ? '' : 'disabled';
+
+    card.innerHTML = `
+      <div class="player-header">
+        <div class="player-name">${escapeHtml(player.name)}</div>
+        ${player.status === 'lost' ? '<div class="status-badge" aria-hidden="true">PERDIDO</div>' : ''}
+      </div>
+
+      <div class="score-display" id="score-${player.id}">${player.score}</div>
+
+      <div class="score-controls">
+        <input type="number" id="input-${player.id}" min="0" placeholder="Pts" ${disabledAttr} aria-label="Agregar puntos a ${escapeHtml(player.name)}" />
+        <button class="btn btn-primary" id="btn-${player.id}" ${disabledAttr} aria-label="Sumar puntos a ${escapeHtml(player.name)}">+</button>
+      </div>
+
+      <details class="history-details">
+        <summary>Historial (${(player.history||[]).length})</summary>
+        <ul class="history-list">${historyHtml}</ul>
+      </details>
+    `;
+
+    dom.scoreboard.appendChild(card);
+
+    // Attach events
+    const inputEl = document.getElementById(`input-${player.id}`);
+    const btnEl = document.getElementById(`btn-${player.id}`);
+    if(btnEl){
+      btnEl.addEventListener('click', ()=> addPoints(player.id));
+      btnEl.addEventListener('touchstart', ()=> btnEl.classList.add('pressed'), {passive:true});
+      btnEl.addEventListener('touchend', ()=> btnEl.classList.remove('pressed'));
+    }
+    if(inputEl){
+      inputEl.addEventListener('keypress', (e)=> { if(e.key === 'Enter') addPoints(player.id); });
+    }
+  });
+}
+
+/* -------------------------
+   Añadir puntos (no finaliza automáticamente)
+   - Mantiene historial y marca "lost" si >=40.
+   ------------------------- */
+function addPoints(id){
+  if(!state.gameActive) return;
+  const input = document.getElementById(`input-${id}`);
+  if(!input) return;
+  const raw = parseInt(input.value,10);
+  if(Number.isNaN(raw) || raw === 0) return;
+  const val = raw;
+  const player = state.players.find(p => p.id === id);
+  if(!player) return;
+
+  const pre = player.score;
+  const post = pre + val;
+  const time = new Date().toLocaleTimeString();
+
+  player.score = post;
+  player.history = player.history || [];
+  player.history.push({ val, pre, post, time });
+
+  if(post >= 40 && player.status !== 'lost'){
+    player.status = 'lost';
+    // notificar visual breve
+    transientNotice(`${player.name} alcanzó ${post} pts → PERDIDO (la partida continúa).`);
+  }
+
+  // animar contador
+  const scoreEl = document.getElementById(`score-${id}`);
+  if(scoreEl){
+    scoreEl.classList.add('animate-pop');
+    setTimeout(()=>scoreEl.classList.remove('animate-pop'), 360);
+  }
+
+  input.value = '';
+  saveState();
+  renderGame();
+}
+
+/* Mensaje temporal tipo toast */
+function transientNotice(msg){
+  const el = document.createElement('div');
+  el.style.position = 'fixed';
+  el.style.left = '50%';
+  el.style.top = '12%';
+  el.style.transform = 'translateX(-50%)';
+  el.style.zIndex = 90;
+  el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9))';
+  el.style.padding = '8px 12px';
+  el.style.borderRadius = '10px';
+  el.style.border = '1px solid var(--border)';
+  el.style.boxShadow = 'var(--shadow)';
+  el.innerText = msg;
+  document.body.appendChild(el);
+  setTimeout(()=> { el.style.opacity = '0'; setTimeout(()=>el.remove(),300); }, 1900);
+}
+
+/* -------------------------
+   Finalizar partida (solo por usuario)
+   - Calcula podio, guarda final data y muestra modal
+   ------------------------- */
+function finalizeGame(){
+  if(!state.gameActive){
+    calculateAndShowPodium();
+    return;
+  }
+  state.gameActive = false;
+  state.endTime = Date.now();
+  saveFinalGameData();
+  saveState();
+  renderGame();
+  calculateAndShowPodium();
+}
+
+function calculateAndShowPodium(){
+  // ordenar por score desc
+  const ranking = [...state.players].sort((a,b) => b.score - a.score);
+
+  dom.podiumList.innerHTML = '';
+  // agrupar por score para empates
+  const groups = {};
+  ranking.forEach(p => { if(!groups[p.score]) groups[p.score] = []; groups[p.score].push(p); });
+  const scores = Object.keys(groups).map(Number).sort((a,b)=>b-a);
+
+  let rankNumber = 1;
+  scores.forEach(score => {
+    const group = groups[score];
+    const names = group.map(g => g.name).join(', ');
+    const label = group.length > 1 ? `${rankNumber}.º (empate)` : `${rankNumber}.º`;
+    const li = document.createElement('li');
+    li.style.display = 'flex';
+    li.style.justifyContent = 'space-between';
+    li.style.padding = '8px 0';
+    li.innerHTML = `<span><strong>${label}</strong> ${escapeHtml(names)}</span><span><strong>${score} pts</strong></span>`;
+    if(score >= 40) li.style.color = 'var(--danger)';
+    dom.podiumList.appendChild(li);
+    rankNumber += group.length;
+  });
+
+  dom.modalReason.textContent = `Finalizada: ${new Date().toLocaleString()}`;
+  openModal();
+}
+
+function openModal(){
+  dom.podiumModal.classList.add('open');
+  dom.podiumModal.setAttribute('aria-hidden','false');
+}
+function closeModal(){ dom.podiumModal.classList.remove('open'); dom.podiumModal.setAttribute('aria-hidden','true'); }
+
+/* -------------------------
+   Nueva partida (mantener nombres)
+   - reinicia puntuaciones e historial
+   ------------------------- */
+function newMatchKeepNames(){
+  if(!confirm('Iniciar nueva partida manteniendo los jugadores (se resetearán las puntuaciones)?')) return;
+  state.players = state.players.map(p => ({ id:p.id, name:p.name, score:0, status:'active', history:[] }));
+  state.gameActive = true;
+  state.startTime = Date.now();
+  state.endTime = null;
+  saveState();
+  renderGame();
+  showGameScreen();
+}
+
+/* -------------------------
+   Editar jugadores (volver a setup)
+   ------------------------- */
+function editPlayers(){
+  // rellenar inputs con los nombres actuales
+  dom.playersInputs.innerHTML = '';
+  if(state.players.length){
+    state.players.forEach(p => addPlayerInput(p.name));
+  } else {
+    addPlayerInput(); addPlayerInput();
+  }
+  showSetupScreen();
+}
+
+/* -------------------------
+   Export / Import JSON
+   ------------------------- */
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `quickstop_export_${Date.now()}.json`;
+  a.click();
+}
+function importJson(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json';
+  input.onchange = (ev) => {
+    const f = ev.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed.players || parsed.players.length < 2){ alert('JSON inválido: necesita al menos 2 jugadores'); return; }
+        // Normalizar
+        state = Object.assign(state, parsed);
+        state.players = state.players.map((p,i) => ({ id:p.id||(Date.now()+i), name:p.name||`Jugador ${i+1}`, score:p.score||0, status:p.status||'active', history:p.history||[] }));
+        saveState();
+        renderGame();
+        showGameScreen();
+      }catch(err){ alert('Error al leer JSON: ' + err.message); }
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+
+/* -------------------------
+   Export podio como imagen (canvas)
+   ------------------------- */
+function downloadPodiumImage(){
+  const canvas = dom.exportCanvas;
+  const ctx = canvas.getContext('2d');
+  const width = 720;
+  const rowH = 56;
+  const headerH = 100;
+  const rows = state.players.length || 1;
+  const height = headerH + rows*rowH + 40;
+  canvas.width = width; canvas.height = height;
+
+  // fondo
+  const bgColor = (state.theme === 'dark') ? '#0f1724' : '#ffffff';
+  ctx.fillStyle = bgColor; ctx.fillRect(0,0,width,height);
+
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillStyle = (state.theme === 'dark') ? '#f1f5f9' : '#111827';
+  ctx.fillText('RESULTADOS - QUICK STOP', width/2, 42);
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = (state.theme === 'dark') ? '#94a3b8' : '#64748b';
+  ctx.fillText(new Date().toLocaleString(), width/2, 64);
+
+  // ranking
+  const sorted = [...state.players].sort((a,b)=>b.score - a.score);
+  ctx.textAlign = 'left';
+  ctx.font = '18px sans-serif';
+  let y = headerH;
+  sorted.forEach((p,i) => {
+    if(i%2===0){ ctx.fillStyle = (state.theme==='dark') ? '#071025' : '#f8fafc'; ctx.fillRect(20,y-36,width-40,46); }
+    const isLost = p.score >= 40;
+    ctx.fillStyle = isLost ? '#ef4444' : ((state.theme==='dark') ? '#f1f5f9' : '#111827');
+    ctx.fillText(`${i+1}.`, 40, y);
+    ctx.fillText(p.name, 90, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${p.score} pts`, width-40, y);
+    ctx.textAlign = 'left';
+    y += rowH;
+  });
+
+  const link = document.createElement('a');
+  link.download = `quickstop_podium_${Date.now()}.png`;
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+/* -------------------------
+   Keyboard shortcuts leves (mantener simple)
+   ------------------------- */
+document.addEventListener('keydown', (e) => {
+  const active = document.activeElement;
+  if(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+  if(!state.gameActive) return;
+  if(e.key === '+' || e.key === '='){
+    if(state.players[0]) { simulateAddPoints(state.players[0].id, 1); }
+  } else if(e.key === '-') {
+    if(state.players[0]) { simulateAddPoints(state.players[0].id, 5); }
+  }
+});
+function simulateAddPoints(id,val){
+  const input = document.getElementById(`input-${id}`);
+  if(input){ input.value = val; addPoints(id); }
+}
+
+/* -------------------------
+   Event bindings
+   ------------------------- */
+dom.finishBtn.addEventListener('click', finalizeGame);
+dom.editPlayersBtn.addEventListener('click', editPlayers);
+dom.newMatchBtn.addEventListener('click', newMatchKeepNames);
+dom.exportJsonBtn.addEventListener('click', exportJson);
+dom.importJsonBtn.addEventListener('click', importJson);
+dom.closeModalBtn.addEventListener('click', closeModal);
+dom.downloadImgBtn.addEventListener('click', downloadPodiumImage);
+
+/* -------------------------
+   Inicialización
+   ------------------------- */
+function init(){
+  loadState();
+  applyTheme();
+  if(state.players.length === 0){
+    // primera vez: prellenar 3 inputs
+    addPlayerInput(); addPlayerInput(); addPlayerInput();
+    showSetupScreen();
+  } else {
+    fillSetupWithSavedPlayers();
+    // Si había una partida activa, restaurar la pantalla de juego; si no, mostrar Setup (permite iniciar otra)
+    if(state.gameActive){
+      renderGame();
+      showGameScreen();
+    } else {
+      // mantener nombres en setup para facilidad; pero permitir ir a tablero si se desea
+      renderGame();
+      showGameScreen();
+    }
+  }
+}
+
+/* Lanzar init */
+init();
+</script>
+</body>
+</html>
